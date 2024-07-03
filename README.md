@@ -922,8 +922,9 @@ RUN javac src/main/java/org/example/*.java
 CMD ["java", "-cp", "src/main/java", "org.example.Clima"]
 ```
 ## Mejora de la estrategia de pruebas:
-### Integrar las pruebas unitarias y de integración en el pipeline de Docker.
 ### Asegurar que los stubs y fakes funcionen correctamente en el entorno contenerizado.
 - al ejecutarse los test en el apartado anterior, se verificaba también los stubs y fakes ya que se encuentran siendo usados dentro de las pruebas de mutación que se estuvieron generando localmente, por lo que tendrán los mismos resultados
 ## Refactorización y código limpio:
 ### Continuar refactorizando el código para mejorar la calidad y mantener la adherencia a los principios de diseño limpio.
+- se ha refactorizado durante todo el proceso, por lo que no se encuentra más alementos para refactorizar.
+![jacoco_upCobertura](Image/jacoco_upCobertura.png)
