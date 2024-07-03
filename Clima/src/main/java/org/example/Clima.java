@@ -5,9 +5,9 @@ import java.util.List;
 import java.util.Scanner;
 
 public class Clima {
-    private List<Sensor> sensores;
+    public List<Sensor> sensores;
 
-    private static Scanner in;
+    public static Scanner in;
 
     public Clima() {
         sensores = new ArrayList<>();

@@ -695,8 +695,68 @@ class HumedadTest {
 - EXPLICACION: Como todos las pruebas están en verde podemos continuar con el proyecto
 ## Métricas de calidad:
 ### 1. Utilizar herramientas para medir la cobertura de pruebas (Jacoco)
-### 2. Evaluar la complejidad del código utilizando métricas como la complejidad ciclomática.
+- se configura gradle para poder usar jacoco y se ejecuta el comando `./gradlew jacocoTestReport`
+```groovy
+plugins {
+    id 'java'
+    id 'info.solidsoft.pitest' version '1.15.0'
+    id 'jacoco'
+}
 
+group = 'com.jhaner'
+version = '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    testImplementation platform('org.junit:junit-bom:5.9.1')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testImplementation 'org.assertj:assertj-core:3.25.3'
+    testImplementation 'org.jetbrains:annotations:24.0.0'
+    pitest 'org.pitest:pitest-junit5-plugin:1.1.0'
+    testImplementation 'org.mockito:mockito-core:4.2.0'
+}
+
+test {
+    useJUnitPlatform()
+}
+
+pitest {
+    targetClasses = ['org.example.*']
+    targetTests = ['org.example.*']
+    mutators = ['DEFAULTS']
+    outputFormats = ['HTML']
+    timestampedReports = false
+}
+
+jacoco {
+    toolVersion = "0.8.12"
+}
+
+jacocoTestReport {
+    dependsOn test
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+    }
+}
+```
+
+![jacoco_run](Image/jacoco_run.png)
+ EXPLICACION: se ha configurado las dependencias necesarias para la utilización del programa jacoco y se ha ejecutado desde el terminal para ver la cobertura de las pruebas
+
+![jacoco_report](Image/jacoco_report.png)
+ EXPLICACION: se verfica que la cobertura de las clases principales se encuentra cubierta y la de los de stub y fakes no están en su totalidad. En el caso de la clase Clima, al ser una clase que solo está generada por métodos void no se ha implementado ningún test por lo que no se encuentra testiado.
+### 2. Evaluar la complejidad del código utilizando métricas como la complejidad ciclomática.
+ EXPLICACION: de la misma imagen se encuentra la complejidad ciclomática
+- Análisis del Reporte
+    - Cobertura Total
+        - Instrucciones Cubiertas: 59%
+    - Ramas Cubiertas: 16%
+- Complejidad Ciclomática
+    - Total de Complejidad Ciclomática (Sumando todas las clases): 69
 # SPRINT 2
 ## Contenerización del Sistema:
 ### Crear un Dockerfile para construir la imagen de la aplicación.
@@ -718,14 +778,152 @@ class HumedadTest {
   ![docker_runClima](Image/docker_runClima.png)
 - EXPLICACION: Se busca entradas interacctivas, por lo que se tiene que incluir en el comando run --rm -it para correr, borrar cuando termine y -it que sea interactivo para que se pueda ingresar datos
 ### Configurar un docker-compose.yml si se necesitan múltiples servicios (bases de datos, servicios de simulación de clima).
+```sh
+version: '3.8'
+services: 
+  clima-app:
+    build: .
+    image: clima-app
+    ports:
+      - "8080:8080"
+    volumes:
+      - .:/app
+    depends_on:
+      - db
+  db:
+    image: postgres:latest
+    environment:
+      POSTGRES_DB: clima 
+      POSTGRES_USER: usuario 
+      POSTGRES_PASSWORD: contraseña 
+    volumes:
+      - db-data:/var/lib/postgresql/data
+volumes:
+  db-data:
+```
+- EXPLICACION: se indica las configuraciones necesarias como el puerto y la imagen que se necesitarán, adenmás de una base de datos por si fuera necesaria posteriormente
 ## Refinamiento del TDD:
 ### Escribir nuevas pruebas para cualquier funcionalidad adicional.
+- no se requieren nuevas funcionalidades, pues el programa funciona como se estaba previsto, pero sí se mejorará la cobertura necesaria en las clases que lo requieran como clima y senso
+```java
+public class ClimaTest {
+    @Mock
+    private Sensor mockSensor;
+    private Clima clima;
+    @BeforeEach
+    public void setUp() {
+        MockitoAnnotations.initMocks(this);
+        clima = new Clima();
+        List<Sensor> sensores = new ArrayList<>();
+        for (int i = 0; i < clima.sensores.size(); i++) {
+            sensores.add(mock(Sensor.class));
+        }
+        clima.sensores = sensores;
+    }
+    @Test
+    public void testAlertas() {
+        for (Sensor sensor : clima.sensores) {
+            when(sensor.verificarAlerta()).thenReturn(true);
+            when(sensor.getMensajeAlerta()).thenReturn("Alerta");
+            when(sensor.getAuxiliar()).thenReturn("Auxiliar");
+        }
+        ByteArrayOutputStream outContent = new ByteArrayOutputStream();
+        System.setOut(new PrintStream(outContent));
+        clima.alertas();
+
+        for (Sensor sensor : clima.sensores) {
+            verify(sensor).verificarAlerta();
+            assertTrue(outContent.toString().contains("Alerta - Auxiliar"));
+        }
+    }
+    @Test
+    public void testOpcionElegida() {
+        Sensor mockSensor = mock(Sensor.class);
+        clima.sensores.set(0, mockSensor);
+        Clima.in = new Scanner("1\n25.0\n");
+        clima.opcionElegida(1);
+        verify(mockSensor).setValor(1.0);
+    }
+    @Test
+    public void testMenu() {
+        Sensor mockSensor = mock(Sensor.class);
+        clima.sensores.set(0, mockSensor);
+        Clima.in = new Scanner("1\n25.0\n");
+        clima.menu();
+        verify(mockSensor).setValor(25.0);
+    }
+}
+public class SensorTest {
+
+    @Mock
+    private Alerta mockAlerta;
+
+    private Sensor sensor;
+
+    @BeforeEach
+    public void setUp() {
+        MockitoAnnotations.initMocks(this);
+        sensor = new Temperatura(0, mockAlerta);
+    }
+
+    @Test
+    public void testVerificarAlerta() {
+        when(mockAlerta.verificar(sensor.getValor(), 20)).thenReturn(true);
+        assertTrue(sensor.verificarAlerta());
+
+        when(mockAlerta.verificar(sensor.getValor(), 20)).thenReturn(false);
+        assertFalse(sensor.verificarAlerta());
+    }
+
+    @Test
+    public void testGetAuxiliar() {
+        assertEquals("Activar sistema de riego", sensor.getAuxiliar());
+    }
+
+    @Test
+    public void testGetMensajeAlerta() {
+        assertEquals("Temperatura Alta", sensor.getMensajeAlerta());
+    }
+
+    @Test
+    public void testSetValor() {
+        sensor.setValor(30);
+        assertEquals(30, sensor.getValor());
+    }
+}
+```
+![jacoco_upCobertura](Image/jacoco_upCobertura.png)
+Explicación: como se observa se ha mejora la cobertura al 100% del sensor y al 87% de Clima con los test introduciodes que buscar cubrir todas las posiblidades posibles.
 ### Asegurar que todas las pruebas existentes pasen en el entorno Dockerizado.
+- se realizan alguna modificaciones en el dockerfile
+```dockerfile
+FROM openjdk:17
+WORKDIR /app
+
+COPY ..
+COPY gradlew .
+COPY gradle gradle
+COPY build.gradle .
+COPY settings.gradle .
+
+RUN chmod +x ./gradlew
+RUN ./gradlew dependencies
+COPY . .
+RUN ./gradlew build
+CMD ["./gradlew", "test"]
+```
+
+![docker_test](Image/docker_test.png)
+- EXPLICACIÓN: se copian los test, clases y dependencias y se ejecutan las configuraciones necesarias en el contenedor con el comando para crear la imagen `docker build -t clima-app .
+` y luego con RUN y CMD se inidca que se ejecuten las pruebas en el contenedor con la instrucción `docker run --name clima-test clima-app`
+- si se quiere dejar ejecutando se tiene el comando `docker run -it --name clima-test clima-app bash`, pero esto se hará si se quiere pasar el test y ejecutar el programa añadiendo
+```dockerfile
+RUN javac src/main/java/org/example/*.java
+CMD ["java", "-cp", "src/main/java", "org.example.Clima"]
+```
 ## Mejora de la estrategia de pruebas:
 ### Integrar las pruebas unitarias y de integración en el pipeline de Docker.
 ### Asegurar que los stubs y fakes funcionen correctamente en el entorno contenerizado.
+- al ejecutarse los test en el apartado anterior, se verificaba también los stubs y fakes ya que se encuentran siendo usados dentro de las pruebas de mutación que se estuvieron generando localmente, por lo que tendrán los mismos resultados
 ## Refactorización y código limpio:
 ### Continuar refactorizando el código para mejorar la calidad y mantener la adherencia a los principios de diseño limpio.
-## Métricas de Calidad:
-### Monitorear la cobertura de pruebas y la complejidad del código en el entorno Dockerizado.
-### Utilizar herramientas de análisis de código para asegurar la calidad.
